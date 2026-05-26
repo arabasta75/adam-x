@@ -1,0 +1,16 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "python app.py"
+healthcheckPath = "/"
+healthcheckTimeout = 60
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+# Variables à configurer dans Railway Dashboard → Variables :
+# SECRET_KEY       = <python -c "import secrets; print(secrets.token_hex(32))">
+# ADMIN_PASSWORD   = adam1234
+# GETXAPI_KEY      = Bearer ...
+# TWITTER293_KEY   = (RapidAPI key)
+# PORT             = 5010
