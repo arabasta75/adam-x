@@ -150,14 +150,15 @@ def _gx_normalize(t: dict) -> dict:
 # ── Twitter293 helpers ─────────────────────────────────────────────────────────
 def _tw293_search(query: str, key: str, cursor: str = None,
                    since: datetime = None, until: datetime = None) -> dict:
-    q_enc = _up.quote(query, safe='')
-    qs    = [f'count=20', 'category=Latest']
+    q_enc   = _up.quote(query, safe='')
+    qs      = ['count=20', 'category=Latest']
+    filters = {}
     if since:
-        qs.append('filters=' + _up.quote(
-            json.dumps({'since': _fmt_dt(since)}, separators=(',', ':')), safe=''))
+        filters['since'] = _fmt_dt(since)
     if until:
-        qs.append('filters=' + _up.quote(
-            json.dumps({'until': _fmt_dt(until)}, separators=(',', ':')), safe=''))
+        filters['until'] = _fmt_dt(until)
+    if filters:
+        qs.append('filters=' + _up.quote(json.dumps(filters, separators=(',', ':')), safe=''))
     if cursor:
         qs.append('cursor=' + _up.quote(cursor, safe=''))
     url = f'https://twitter293.p.rapidapi.com/search/{q_enc}?' + '&'.join(qs)
@@ -339,14 +340,16 @@ def _zoom_to_micro_window(query: str, key: str, jid: str,
         _log_step(jid, f'  zoom probe [{_fmt_dt(low)} → {_fmt_dt(mid)}]: {count} tweets')
 
         if count == 0:
-            # Nothing in first half → oldest tweet is in second half
+            # Nothing in first half → oldest tweet is in second half [low, high] stays but push low up
             low = mid
-        elif count < target_page_size:
-            # First half has few tweets → it might contain the oldest, zoom in
-            high = mid
         else:
-            # First half is dense → go even earlier
+            # Tweets exist in first half → zoom into it to find the oldest
             high = mid
+
+    # Safety: always return a window that spans at least 2h to avoid empty exhaust
+    if (high - low).total_seconds() < 7200:
+        low = low - timedelta(hours=1)
+        high = high + timedelta(hours=1)
 
     return low, high
 
