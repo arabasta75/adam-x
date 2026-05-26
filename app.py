@@ -354,22 +354,19 @@ def _zoom_to_micro_window(query: str, key: str, jid: str,
     return low, high
 
 
-def _exhaust_window_tw293(query: str, key: str, jid: str,
-                           win_start: datetime, win_end: datetime,
-                           max_pages: int = 30) -> list:
-    """Paginate Twitter293 exhaustively within the micro-window, collect all tweets."""
-    _log_step(jid, f'TW293 exhaust [{_fmt_dt(win_start)} → {_fmt_dt(win_end)}]')
+def _tw293_exhaust(q_with_ops: str, key: str, jid: str, max_pages: int = 30) -> list:
+    """Paginate Twitter293 exhaustively on a query that already contains since:/until: operators."""
     seen  = set()
     all_t = []
     cursor = None
 
     for page in range(max_pages):
         try:
-            raw    = _tw293_search(query, key, cursor=cursor, since=win_start, until=win_end)
+            raw    = _tw293_search(q_with_ops, key, cursor=cursor)
             tweets = _tw293_parse_tweets(raw)
             cursor = _tw293_get_cursor(raw)
         except Exception as e:
-            _log_step(jid, f'  TW293 error page {page}: {e}')
+            _log_step(jid, f'  TW293 error page {page+1}: {e}')
             break
 
         new = 0
@@ -389,6 +386,35 @@ def _exhaust_window_tw293(query: str, key: str, jid: str,
             break
 
     return all_t
+
+
+def _exhaust_window_tw293(query: str, key: str, jid: str,
+                           win_start: datetime, win_end: datetime,
+                           max_pages: int = 30) -> list:
+    """Exhaust micro-window via Twitter293 — operators embedded in query string."""
+    # Strategy 1: since:/until: operators in the query (most reliable)
+    q_ops = f'{query} since:{_fmt_dt(win_start)} until:{_fmt_dt(win_end)}'
+    _log_step(jid, f'TW293 exhaust (ops): {q_ops}')
+    results = _tw293_exhaust(q_ops, key, jid, max_pages)
+    if results:
+        return results
+
+    # Strategy 2: just since: operator (until: sometimes causes empty results)
+    q_since = f'{query} since:{_fmt_dt(win_start)}'
+    _log_step(jid, f'TW293 exhaust (since only): {q_since}')
+    results = _tw293_exhaust(q_since, key, jid, max_pages=5)
+    if results:
+        # Filter locally to the window
+        cutoff = win_end + timedelta(hours=2)
+        results = [t for t in results
+                   if _parse_dt(t['created_at']) and _parse_dt(t['created_at']) <= cutoff]
+        if results:
+            return results
+
+    # Strategy 3: plain query, no time constraint — take oldest from first pages
+    _log_step(jid, f'TW293 exhaust (plain fallback): {query}')
+    results = _tw293_exhaust(query, key, jid, max_pages=3)
+    return results
 
 
 def _exhaust_window_gx(query: str, key: str, jid: str,
@@ -938,10 +964,13 @@ function showResult(r) {
 }
 
 function showError(msg) {
-  document.getElementById('statusBar').classList.remove('visible');
+  // Keep status bar (log) visible so user can diagnose
   const p = document.getElementById('noResult');
   p.textContent = '✗ ' + msg;
   p.style.display = '';
+  // Remove the pulse animation
+  const dot = document.querySelector('.phase-dot');
+  if (dot) dot.style.animation = 'none';
 }
 
 function clearResult() {
