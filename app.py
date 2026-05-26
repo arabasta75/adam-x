@@ -263,7 +263,8 @@ def _tw293_normalize(t: dict) -> dict:
             'author':      username.lower(),
             'author_name': udata.get('name') or username,
             'created_at':  dt.isoformat() if dt else '',
-            'url':         f'https://x.com/{username}/status/{tid}' if tid and username else '',
+            'url':         (f'https://x.com/{username}/status/{tid}' if tid and username
+                       else f'https://x.com/i/web/status/{tid}' if tid else ''),
             'likes':       leg.get('favorite_count', 0),
             'retweets':    leg.get('retweet_count', 0),
             'source':      'twitter293',
@@ -282,7 +283,8 @@ def _tw293_normalize(t: dict) -> dict:
         'author':      username,
         'author_name': user.get('name') or t.get('name') or username,
         'created_at':  dt.isoformat() if dt else '',
-        'url':         f'https://x.com/{username}/status/{tid}' if tid and username else '',
+        'url':         (f'https://x.com/{username}/status/{tid}' if tid and username
+                       else f'https://x.com/i/web/status/{tid}' if tid else ''),
         'likes':       t.get('favorite_count', 0) or t.get('likeCount', 0),
         'retweets':    t.get('retweet_count', 0) or t.get('retweetCount', 0),
         'source':      'twitter293',
